@@ -11,6 +11,8 @@ Usage (run from the repo root):
   python -m home_brain test            # record 60s right now + extract (dev)
   python -m home_brain list [date]     # list stored clips for a date
   python -m home_brain schedule        # daily cron-style scheduler loop
+  python -m home_brain analyse [date]  # analyse pending clips (Phase 2)
+  python -m home_brain summarise [date] # generate daily summary (Phase 2)
 """
 import os
 import sys
@@ -78,6 +80,41 @@ def cmd_list(target_date: Optional[date] = None) -> None:
         )
 
 
+def cmd_analyse(target_date: Optional[date] = None) -> None:
+    """Analyse all pending clips with Claude Vision + Whisper (Phase 2)."""
+    if target_date is None:
+        target_date = date.today()
+
+    logger.info(f"=== Home Brain | Clip Analysis | {target_date} ===")
+    container = build_container()
+    observations = container.clip_analysis_service.analyse_pending_clips()
+
+    print(f"\nAnalysed {len(observations)} clip(s).")
+    for obs in observations:
+        print(
+            f"  [{obs.clip_id[:8]}] mood={obs.mood.value} "
+            f"confidence={obs.confidence:.2f} | {obs.activity}"
+        )
+
+
+def cmd_summarise(target_date: Optional[date] = None) -> None:
+    """Generate a DailySummary from all Observations for a date (Phase 2)."""
+    if target_date is None:
+        target_date = date.today() - timedelta(days=1)
+
+    logger.info(f"=== Home Brain | Daily Summary | {target_date} ===")
+    container = build_container()
+    try:
+        summary = container.clip_analysis_service.generate_daily_summary(target_date)
+        print(f"\nSummary for {target_date}:")
+        print(f"  {summary.summary_text}")
+        print(f"  Moods: {summary.mood_counts}")
+        print(f"  Highlights: {summary.highlight_clip_ids}")
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+
 def cmd_schedule() -> None:
     """
     Runs as a daily scheduler.
@@ -122,9 +159,17 @@ def main() -> None:
     elif command == "schedule":
         cmd_schedule()
 
+    elif command == "analyse":
+        target = date.fromisoformat(args[1]) if len(args) > 1 else None
+        cmd_analyse(target)
+
+    elif command == "summarise":
+        target = date.fromisoformat(args[1]) if len(args) > 1 else None
+        cmd_summarise(target)
+
     else:
         print(f"Unknown command: {command}")
-        print("Usage: python -m home_brain [run|test|list|schedule] [date]")
+        print("Usage: python -m home_brain [run|test|list|schedule|analyse|summarise] [date]")
         sys.exit(1)
 
 
