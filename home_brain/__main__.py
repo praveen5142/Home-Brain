@@ -13,6 +13,9 @@ Usage (run from the repo root):
   python -m home_brain schedule        # daily cron-style scheduler loop
   python -m home_brain analyse [date]  # analyse pending clips (Phase 2)
   python -m home_brain summarise [date] # generate daily summary (Phase 2)
+  python -m home_brain notify [date]   # send summary to Telegram (Phase 3)
+  python -m home_brain archive         # archive old clips to B2 (Phase 3)
+  python -m home_brain full-run [date] # run + analyse + summarise + notify + archive
 """
 import os
 import sys
@@ -115,6 +118,44 @@ def cmd_summarise(target_date: Optional[date] = None) -> None:
         sys.exit(1)
 
 
+def cmd_notify(target_date: Optional[date] = None) -> None:
+    """Send the DailySummary for a date to Telegram (default: yesterday)."""
+    if target_date is None:
+        target_date = date.today() - timedelta(days=1)
+
+    logger.info(f"=== Home Brain | Notify | {target_date} ===")
+    container = build_container()
+    try:
+        container.memory_service.deliver_daily_summary(target_date)
+        print(f"Summary for {target_date} delivered to Telegram.")
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        sys.exit(1)
+
+
+def cmd_archive() -> None:
+    """Archive clips older than RETENTION_DAYS to Backblaze B2."""
+    logger.info("=== Home Brain | Archive ===")
+    container = build_container()
+    archived = container.memory_service.archive_old_clips(
+        container._config.storage.retention_days
+    )
+    print(f"Archived {len(archived)} clip(s).")
+
+
+def cmd_full_run(target_date: Optional[date] = None) -> None:
+    """Run the full daily pipeline: extract → analyse → summarise → notify → archive."""
+    if target_date is None:
+        target_date = date.today() - timedelta(days=1)
+
+    logger.info(f"=== Home Brain | Full Run | {target_date} ===")
+    cmd_run(target_date)
+    cmd_analyse(target_date)
+    cmd_summarise(target_date)
+    cmd_notify(target_date)
+    cmd_archive()
+
+
 def cmd_schedule() -> None:
     """
     Runs as a daily scheduler.
@@ -136,9 +177,9 @@ def cmd_schedule() -> None:
         time.sleep(wait_seconds)
 
         try:
-            cmd_run()
+            cmd_full_run()
         except Exception as e:
-            logger.error(f"Scheduled extraction failed: {e}")
+            logger.error(f"Scheduled full-run failed: {e}")
 
 
 def main() -> None:
@@ -167,9 +208,23 @@ def main() -> None:
         target = date.fromisoformat(args[1]) if len(args) > 1 else None
         cmd_summarise(target)
 
+    elif command == "notify":
+        target = date.fromisoformat(args[1]) if len(args) > 1 else None
+        cmd_notify(target)
+
+    elif command == "archive":
+        cmd_archive()
+
+    elif command == "full-run":
+        target = date.fromisoformat(args[1]) if len(args) > 1 else None
+        cmd_full_run(target)
+
     else:
         print(f"Unknown command: {command}")
-        print("Usage: python -m home_brain [run|test|list|schedule|analyse|summarise] [date]")
+        print(
+            "Usage: python -m home_brain "
+            "[run|test|list|schedule|analyse|summarise|notify|archive|full-run] [date]"
+        )
         sys.exit(1)
 
 
