@@ -7,9 +7,9 @@
 # ── Phase 1 — Surveillance Domain ────────────────────
 python-dotenv>=1.0.0
 
-# ── Phase 2 — Intelligence Domain (uncomment when ready) ─
-# anthropic>=0.25.0
-# faster-whisper>=1.0.0
+# ── Phase 2 — Intelligence Domain ────────────────────────
+anthropic>=0.25.0
+faster-whisper>=1.0.0
 
 # ── Phase 3 — Memory Domain (uncomment when ready) ───
 # python-telegram-bot>=20.0

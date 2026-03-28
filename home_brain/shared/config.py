@@ -80,10 +80,27 @@ class MotionConfig:
 
 
 @dataclass(frozen=True)
+class IntelligenceConfig:
+    """Phase 2: settings for Claude Vision and Whisper transcription."""
+    anthropic_api_key: str
+    whisper_model: str
+    frame_extraction_fps: int
+
+    @classmethod
+    def default(cls) -> "IntelligenceConfig":
+        return cls(
+            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+            whisper_model=os.getenv("WHISPER_MODEL", "small"),
+            frame_extraction_fps=int(os.getenv("FRAME_EXTRACTION_FPS", "1")),
+        )
+
+
+@dataclass(frozen=True)
 class AppConfig:
     camera: CameraConfig
     storage: StorageConfig
     motion: MotionConfig
+    intelligence: IntelligenceConfig
     record_duration_s: int  # 86400 for production 24h; 60 for dev/test
 
     @classmethod
@@ -99,5 +116,6 @@ class AppConfig:
             ),
             storage=StorageConfig.default(),
             motion=MotionConfig.default(),
+            intelligence=IntelligenceConfig.default(),
             record_duration_s=int(os.getenv("RECORD_DURATION_S", "86400")),
         )
