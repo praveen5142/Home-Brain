@@ -96,11 +96,34 @@ class IntelligenceConfig:
 
 
 @dataclass(frozen=True)
+class MemoryConfig:
+    """Phase 3: settings for Telegram notifications and Backblaze B2 archival."""
+    telegram_bot_token: str
+    telegram_chat_id: str
+    b2_key_id: str
+    b2_application_key: str
+    b2_bucket_name: str
+    b2_endpoint_url: str
+
+    @classmethod
+    def default(cls) -> "MemoryConfig":
+        return cls(
+            telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+            telegram_chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
+            b2_key_id=os.getenv("B2_APPLICATION_KEY_ID", ""),
+            b2_application_key=os.getenv("B2_APPLICATION_KEY", ""),
+            b2_bucket_name=os.getenv("B2_BUCKET_NAME", ""),
+            b2_endpoint_url=os.getenv("B2_ENDPOINT_URL", "https://s3.us-west-004.backblazeb2.com"),
+        )
+
+
+@dataclass(frozen=True)
 class AppConfig:
     camera: CameraConfig
     storage: StorageConfig
     motion: MotionConfig
     intelligence: IntelligenceConfig
+    memory: MemoryConfig
     record_duration_s: int  # 86400 for production 24h; 60 for dev/test
 
     @classmethod
@@ -117,5 +140,6 @@ class AppConfig:
             storage=StorageConfig.default(),
             motion=MotionConfig.default(),
             intelligence=IntelligenceConfig.default(),
+            memory=MemoryConfig.default(),
             record_duration_s=int(os.getenv("RECORD_DURATION_S", "86400")),
         )

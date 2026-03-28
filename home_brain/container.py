@@ -32,6 +32,16 @@ from .intelligence.domain.ports.ports import (
     ITranscriptionPort,
 )
 from .intelligence.domain.services.clip_analysis_service import ClipAnalysisService
+from .memory.adapters.sqlite_memory_adapter import SQLiteMemoryAdapter
+from .memory.adapters.telegram_notification_adapter import TelegramNotificationAdapter
+from .memory.adapters.backblaze_b2_archive_adapter import BackblazeB2ArchiveAdapter
+from .memory.domain.ports.ports import (
+    IClipRetentionPort,
+    ISummaryQueryPort,
+    INotificationPort,
+    IArchivePort,
+)
+from .memory.domain.services.memory_service import MemoryService
 
 
 class Container:
@@ -53,6 +63,12 @@ class Container:
         self._video_analysis: IVideoAnalysisPort | None = None
         self._transcription: ITranscriptionPort | None = None
         self._clip_analysis_service: ClipAnalysisService | None = None
+        # Memory
+        self._clip_retention: IClipRetentionPort | None = None
+        self._summary_query: ISummaryQueryPort | None = None
+        self._notification: INotificationPort | None = None
+        self._archive: IArchivePort | None = None
+        self._memory_service: MemoryService | None = None
 
     # ------------------------------------------------------------------
     # Surveillance domain
@@ -137,6 +153,58 @@ class Container:
                 observation_store=self.observation_store,
             )
         return self._clip_analysis_service
+
+
+    # ------------------------------------------------------------------
+    # Memory domain
+    # ------------------------------------------------------------------
+
+    @property
+    def clip_retention(self) -> IClipRetentionPort:
+        """SQLiteMemoryAdapter also implements ISummaryQueryPort."""
+        if self._clip_retention is None:
+            self._clip_retention = SQLiteMemoryAdapter(
+                db_path=self._config.storage.db_path
+            )
+        return self._clip_retention
+
+    @property
+    def summary_query(self) -> ISummaryQueryPort:
+        """Reuse the same SQLiteMemoryAdapter instance (dual-role)."""
+        if self._summary_query is None:
+            self._summary_query = self.clip_retention  # type: ignore[assignment]
+        return self._summary_query
+
+    @property
+    def notification(self) -> INotificationPort:
+        if self._notification is None:
+            self._notification = TelegramNotificationAdapter(
+                bot_token=self._config.memory.telegram_bot_token,
+                chat_id=self._config.memory.telegram_chat_id,
+            )
+        return self._notification
+
+    @property
+    def archive(self) -> IArchivePort:
+        if self._archive is None:
+            self._archive = BackblazeB2ArchiveAdapter(
+                key_id=self._config.memory.b2_key_id,
+                application_key=self._config.memory.b2_application_key,
+                bucket_name=self._config.memory.b2_bucket_name,
+                endpoint_url=self._config.memory.b2_endpoint_url,
+            )
+        return self._archive
+
+    @property
+    def memory_service(self) -> MemoryService:
+        if self._memory_service is None:
+            self._memory_service = MemoryService(
+                clip_retention=self.clip_retention,
+                summary_query=self.summary_query,
+                notification=self.notification,
+                archive=self.archive,
+            )
+        return self._memory_service
 
 
 def build_container() -> Container:
